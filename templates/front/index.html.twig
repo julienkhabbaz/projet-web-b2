@@ -11,11 +11,9 @@
                         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation"> <span class="navbar-toggler-icon"></span> </button>
                         <div class="collapse navbar-collapse" id="navbarNavDropdown" >
 
-                            <ul class="navbar-nav ml-auto" >
-                                <li class="nav-item "> <a class="nav-link nav-a " style="color: red;" href="connecter.html">Se connecter </a> </li>
-                                <li class="nav-item "> <a class="nav-link nav-a " style="color: red;" href="#">S'inscrire</a> </li>
-                                <li class="nav-item "> <a class="nav-link nav-a " style="color: red;" href="#"> Besoin d'aide ?</a> </li>
-                            </ul>
+                            {{ render(controller(
+                                'App\\Controller\\FrontController::FrontMenu'
+                            )) }}
 
                         </div>
                     </nav>

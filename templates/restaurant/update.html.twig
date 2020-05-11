@@ -1,0 +1,65 @@
+{% extends 'admin.html.twig' %}
+
+{% block title %} !{% endblock %}
+
+{% block body %}
+    <center><h3>{{ Error }}</h3></center>
+    <center><h3>{{ Success }}</h3></center>
+    <a href="{{ path('admin_restaurant') }}" class="btn btn-primary">Liste des restaurants</a> <br/>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="panel panel-primary" data-collapsed="0">
+                <div class="panel-heading">
+                    <div class="panel-title">
+                        Mettre à jour le restaurant
+                    </div>
+                    <div class="panel-options"> <a href="#" data-rel="collapse"><i
+                                    class="entypo-down-open"></i></a> <a href="#" data-rel="reload"><i
+                                    class="entypo-arrows-ccw"></i></a> <a href="#" data-rel="close"><i
+                                    class="entypo-cancel"></i></a></div>
+                </div>
+                <div class="panel-body">
+                    <form action="" method="post" role="form" enctype="multipart/form-data" class="form-horizontal form-groups-bordered">
+                        <div class="form-group">
+                            <label for="field-1" class="col-sm-3 control-label">Nom</label>
+                            <div class="col-sm-5">
+                                <input type="text" required disabled name="name"
+                                       class="form-control" value="{{ Restaurant.name }}" id="field-1"
+                                       placeholder="Placeholder({{ Restaurant.name }})">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="field-2" class="col-sm-3 control-label">Logo</label>
+                            <div class="col-sm-5">
+                                <input type="file" name="logo"
+                                       class="form-control" id="field-2">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="field-3" class="col-sm-3 control-label">Email</label>
+                            <div class="col-sm-5">
+                                <input type="text" required value="{{ Restaurant.email }}" name="email"
+                                       class="form-control" id="field-3"
+                                       placeholder="Placeholder(Email)">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="field-4" class="col-sm-3 control-label">Adresse</label>
+                            <div class="col-sm-5">
+                                <textarea name="address" id="field-4" placeholder="Placeholder(Adresse)" required class="form-control" cols="30" rows="10">{{ Restaurant.address|raw }}</textarea>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="col-sm-offset-3 col-sm-5">
+                                <button type="submit" class="btn btn-info">Mettre à jour</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    <br><br><br><br><br>
+    <br><br><br><br><br>
+
+{% endblock %}

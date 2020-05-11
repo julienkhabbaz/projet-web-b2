@@ -64,7 +64,9 @@ class RestaurantController extends AbstractController
 
                         $rest->setName($request->get('name'));
                         $rest->setEmail($request->get('email'));
+                        $rest->setPassword($request->get('password'));
                         $rest->setAddress($request->get('address'));
+                        $rest->setStatus(1);
                         $em->persist($rest);
                         $em->flush();
                         $success = 'Restaurant ajouté avec succès!';

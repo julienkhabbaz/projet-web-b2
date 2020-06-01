@@ -1,1 +1,3 @@
-# projet-web-b2
+Projet Développement WEB
+
+Site de livraison de repas

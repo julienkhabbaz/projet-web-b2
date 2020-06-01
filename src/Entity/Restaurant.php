@@ -2,66 +2,78 @@
 
 namespace App\Entity;
 
+use App\Repository\RestaurantRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Vich\UploaderBundle\Mapping\Annotation as Vich;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\HttpFoundation\File\File;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 
 /**
- * Restaurant
- *
- * @ORM\Table(name="restaurant")
- * @ORM\Entity
+ * @ORM\Entity(repositoryClass=RestaurantRepository::class)
+ * @Vich\Uploadable
  */
 class Restaurant
 {
     /**
-     * @var int
-     *
-     * @ORM\Column(name="id", type="integer", nullable=false)
-     * @ORM\Id
-     * @ORM\GeneratedValue(strategy="IDENTITY")
+     * @ORM\Id()
+     * @ORM\GeneratedValue()
+     * @ORM\Column(type="integer")
      */
     private $id;
 
     /**
-     * @var string|null
-     *
-     * @ORM\Column(name="name", type="string", length=255, nullable=true, options={"default"="NULL"})
+     * @ORM\Column(type="string", length=255)
      */
-    private $name = 'NULL';
+    private $name;
 
     /**
-     * @var string|null
-     *
-     * @ORM\Column(name="logo", type="text", length=0, nullable=true, options={"default"="NULL"})
+     * @ORM\Column(type="string", length=255)
      */
-    private $logo = 'NULL';
+    private $description;
 
     /**
-     * @var string|null
-     *
-     * @ORM\Column(name="email", type="string", length=255, nullable=true, options={"default"="NULL"})
+     * @ORM\Column(type="string", length=255)
      */
-    private $email = 'NULL';
+    private $adresse;
 
     /**
+     * @ORM\OneToMany(targetEntity=Plat::class, mappedBy="restaurant",cascade={"persist", "remove"})
+     */
+    private $plats;
+
+    /**
+     * @ORM\Column(type="string",length=255, nullable=true)
      * @var string
-     *
-     * @ORM\Column(name="password", type="string", length=255, nullable=false)
      */
-    private $password;
+    private $filename;
+
 
     /**
-     * @var string|null
-     *
-     * @ORM\Column(name="address", type="text", length=0, nullable=true, options={"default"="NULL"})
+     * @Vich\UploadableField(mapping="restaurant_image", fileNameProperty="filename")
+     * @Assert\Image(
+     * mimeTypes="image/png")
+     * @var File
      */
-    private $address = 'NULL';
+    private $imageFile;
 
     /**
-     * @var int|null
-     *
-     * @ORM\Column(name="status", type="integer", nullable=true, options={"default"="NULL"})
+     * @ORM\Column(type="datetime",nullable=true)
+     * @var \DateTime|null
      */
-    private $status = 'NULL';
+    private $updated_at;
+
+    /**
+     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="restaurants")
+     */
+    private $user;
+
+    public function __construct()
+    {
+        $this->plats = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -73,72 +85,134 @@ class Restaurant
         return $this->name;
     }
 
-    public function setName(?string $name): self
+    public function setName(string $name): self
     {
         $this->name = $name;
 
         return $this;
     }
 
-    public function getLogo(): ?string
+    public function getDescription(): ?string
     {
-        return $this->logo;
+        return $this->description;
     }
 
-    public function setLogo(?string $logo): self
+    public function setDescription(string $description): self
     {
-        $this->logo = $logo;
+        $this->description = $description;
 
         return $this;
     }
 
-    public function getEmail(): ?string
+    public function getAdresse(): ?string
     {
-        return $this->email;
+        return $this->adresse;
     }
 
-    public function setEmail(?string $email): self
+    public function setAdresse(string $adresse): self
     {
-        $this->email = $email;
+        $this->adresse = $adresse;
 
         return $this;
     }
 
-    public function getPassword(): ?string
+    /**
+     * @return Collection|Plat[]
+     */
+    public function getPlats(): Collection
     {
-        return $this->password;
+        return $this->plats;
     }
 
-    public function setPassword(string $password): self
+    public function addPlat(Plat $plat): self
     {
-        $this->password = $password;
+        if (!$this->plats->contains($plat)) {
+            $this->plats[] = $plat;
+            $plat->setRestaurant($this);
+        }
 
         return $this;
     }
 
-    public function getAddress(): ?string
+    public function removePlat(Plat $plat): self
     {
-        return $this->address;
-    }
-
-    public function setAddress(?string $address): self
-    {
-        $this->address = $address;
+        if ($this->plats->contains($plat)) {
+            $this->plats->removeElement($plat);
+            // set the owning side to null (unless already changed)
+            if ($plat->getRestaurant() === $this) {
+                $plat->setRestaurant(null);
+            }
+        }
 
         return $this;
     }
 
-    public function getStatus(): ?int
+    /**
+     * @return string|null
+     */
+    public function getFilename(): ?string
     {
-        return $this->status;
+        return $this->filename;
     }
 
-    public function setStatus(?int $status): self
+    /**
+     *@return File|null
+     */
+    public function getImageFile(): ?File
     {
-        $this->status = $status;
+        return $this->imageFile;
+    }
+
+    /**
+     * @param null|string $filename
+     * @return Restaurant
+     */
+    public function setFilename(?string $filename): Restaurant
+    {
+        $this->filename = $filename;
+        return $this;
+    }
+
+    /**
+     * @param File|\Symfony\Component\HttpFoundation\File\UploadedFile $imageFile
+     */
+    public function setImageFile(?File $imageFile = null): Restaurant
+    {
+        $this->imageFile = $imageFile;
+        if (null != $imageFile) {
+            if ($this->imageFile instanceof UploadedFile) {
+                $this->updated_at = new \DateTime('now');
+            }
+        }
+        return $this;
+    }
+
+    public function getUpdatedAt(): ?\DateTimeInterface
+    {
+        return $this->updated_at;
+    }
+
+    public function setUpdatedAt(\DateTimeInterface $updated_at): self
+    {
+        $this->updated_at = $updated_at;
+    }
+
+
+    public function getUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function setUser(?User $user): self
+    {
+        $this->user = $user;
 
         return $this;
     }
 
 
+    public function __toString(): string
+    {
+        return $this->name;
+    }
 }

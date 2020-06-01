@@ -12,6 +12,7 @@
 namespace Symfony\Component\Form\Extension\Core\Type;
 
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Exception\LogicException;
 use Symfony\Component\Form\Extension\Core\DataTransformer\ArrayToPartsTransformer;
 use Symfony\Component\Form\Extension\Core\DataTransformer\DataTransformerChain;
 use Symfony\Component\Form\Extension\Core\DataTransformer\DateTimeImmutableToDateTimeTransformer;
@@ -108,7 +109,17 @@ class DateTimeType extends AbstractType
                 'invalid_message_parameters',
             ]));
 
-            if (isset($emptyData['date'])) {
+            if ($emptyData instanceof \Closure) {
+                $lazyEmptyData = static function ($option) use ($emptyData) {
+                    return static function (FormInterface $form) use ($emptyData, $option) {
+                        $emptyData = $emptyData($form->getParent());
+
+                        return isset($emptyData[$option]) ? $emptyData[$option] : '';
+                    };
+                };
+
+                $dateOptions['empty_data'] = $lazyEmptyData('date');
+            } elseif (isset($emptyData['date'])) {
                 $dateOptions['empty_data'] = $emptyData['date'];
             }
 
@@ -127,7 +138,9 @@ class DateTimeType extends AbstractType
                 'invalid_message_parameters',
             ]));
 
-            if (isset($emptyData['time'])) {
+            if ($emptyData instanceof \Closure) {
+                $timeOptions['empty_data'] = $lazyEmptyData('time');
+            } elseif (isset($emptyData['time'])) {
                 $timeOptions['empty_data'] = $emptyData['time'];
             }
 
@@ -159,10 +172,6 @@ class DateTimeType extends AbstractType
             $dateOptions['input'] = $timeOptions['input'] = 'array';
             $dateOptions['error_bubbling'] = $timeOptions['error_bubbling'] = true;
 
-            if (isset($dateOptions['format']) && DateType::HTML5_FORMAT !== $dateOptions['format']) {
-                $dateOptions['html5'] = false;
-            }
-
             $builder
                 ->addViewTransformer(new DataTransformerChain([
                     new DateTimeToArrayTransformer($options['model_timezone'], $options['view_timezone'], $parts),
@@ -171,8 +180,8 @@ class DateTimeType extends AbstractType
                         'time' => $timeParts,
                     ]),
                 ]))
-                ->add('date', __NAMESPACE__.'\DateType', $dateOptions)
-                ->add('time', __NAMESPACE__.'\TimeType', $timeOptions)
+                ->add('date', DateType::class, $dateOptions)
+                ->add('time', TimeType::class, $timeOptions)
             ;
         }
 
@@ -206,6 +215,14 @@ class DateTimeType extends AbstractType
         //  * the html5 is set to true
         if ($options['html5'] && 'single_text' === $options['widget'] && self::HTML5_FORMAT === $options['format']) {
             $view->vars['type'] = 'datetime-local';
+
+            // we need to force the browser to display the seconds by
+            // adding the HTML attribute step if not already defined.
+            // Otherwise the browser will not display and so not send the seconds
+            // therefore the value will always be considered as invalid.
+            if ($options['with_seconds'] && !isset($view->vars['attr']['step'])) {
+                $view->vars['attr']['step'] = 1;
+            }
         }
     }
 
@@ -300,37 +317,33 @@ class DateTimeType extends AbstractType
 
         $resolver->setAllowedTypes('input_format', 'string');
 
-        $resolver->setDeprecated('date_format', function (Options $options, $dateFormat) {
+        $resolver->setNormalizer('date_format', function (Options $options, $dateFormat) {
             if (null !== $dateFormat && 'single_text' === $options['widget'] && self::HTML5_FORMAT === $options['format']) {
-                return sprintf('Using the "date_format" option of %s with an HTML5 date widget is deprecated since Symfony 4.3 and will lead to an exception in 5.0.', self::class);
-                //throw new LogicException(sprintf('Cannot use the "date_format" option of the %s with an HTML5 date.', self::class));
+                throw new LogicException(sprintf('Cannot use the "date_format" option of the "%s" with an HTML5 date.', self::class));
             }
 
-            return '';
+            return $dateFormat;
         });
-        $resolver->setDeprecated('date_widget', function (Options $options, $dateWidget) {
+        $resolver->setNormalizer('date_widget', function (Options $options, $dateWidget) {
             if (null !== $dateWidget && 'single_text' === $options['widget']) {
-                return sprintf('Using the "date_widget" option of %s when the "widget" option is set to "single_text" is deprecated since Symfony 4.3 and will lead to an exception in 5.0.', self::class);
-                //throw new LogicException(sprintf('Cannot use the "date_widget" option of the %s when the "widget" option is set to "single_text".', self::class));
+                throw new LogicException(sprintf('Cannot use the "date_widget" option of the "%s" when the "widget" option is set to "single_text".', self::class));
             }
 
-            return '';
+            return $dateWidget;
         });
-        $resolver->setDeprecated('time_widget', function (Options $options, $timeWidget) {
+        $resolver->setNormalizer('time_widget', function (Options $options, $timeWidget) {
             if (null !== $timeWidget && 'single_text' === $options['widget']) {
-                return sprintf('Using the "time_widget" option of %s when the "widget" option is set to "single_text" is deprecated since Symfony 4.3 and will lead to an exception in 5.0.', self::class);
-                //throw new LogicException(sprintf('Cannot use the "time_widget" option of the %s when the "widget" option is set to "single_text".', self::class));
+                throw new LogicException(sprintf('Cannot use the "time_widget" option of the "%s" when the "widget" option is set to "single_text".', self::class));
             }
 
-            return '';
+            return $timeWidget;
         });
-        $resolver->setDeprecated('html5', function (Options $options, $html5) {
+        $resolver->setNormalizer('html5', function (Options $options, $html5) {
             if ($html5 && self::HTML5_FORMAT !== $options['format']) {
-                return sprintf('Using a custom format when the "html5" option of %s is enabled is deprecated since Symfony 4.3 and will lead to an exception in 5.0.', self::class);
-                //throw new LogicException(sprintf('Cannot use the "format" option of %s when the "html5" option is disabled.', self::class));
+                throw new LogicException(sprintf('Cannot use the "format" option of "%s" when the "html5" option is enabled.', self::class));
             }
 
-            return '';
+            return $html5;
         });
     }
 

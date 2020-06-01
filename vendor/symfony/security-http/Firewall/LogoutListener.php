@@ -28,12 +28,10 @@ use Symfony\Component\Security\Http\ParameterBagUtils;
  *
  * @author Fabien Potencier <fabien@symfony.com>
  *
- * @final since Symfony 4.3
+ * @final
  */
-class LogoutListener implements ListenerInterface
+class LogoutListener extends AbstractListener
 {
-    use LegacyListenerTrait;
-
     private $tokenStorage;
     private $options;
     private $handlers;
@@ -42,10 +40,7 @@ class LogoutListener implements ListenerInterface
     private $csrfTokenManager;
 
     /**
-     * @param HttpUtils                      $httpUtils        An HttpUtils instance
-     * @param LogoutSuccessHandlerInterface  $successHandler   A LogoutSuccessHandlerInterface instance
-     * @param array                          $options          An array of options to process a logout attempt
-     * @param CsrfTokenManagerInterface|null $csrfTokenManager A CsrfTokenManagerInterface instance
+     * @param array $options An array of options to process a logout attempt
      */
     public function __construct(TokenStorageInterface $tokenStorage, HttpUtils $httpUtils, LogoutSuccessHandlerInterface $successHandler, array $options = [], CsrfTokenManagerInterface $csrfTokenManager = null)
     {
@@ -67,6 +62,14 @@ class LogoutListener implements ListenerInterface
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function supports(Request $request): ?bool
+    {
+        return $this->requiresLogout($request);
+    }
+
+    /**
      * Performs the logout if requested.
      *
      * If a CsrfTokenManagerInterface instance is available, it will be used to
@@ -75,13 +78,9 @@ class LogoutListener implements ListenerInterface
      * @throws LogoutException   if the CSRF token is invalid
      * @throws \RuntimeException if the LogoutSuccessHandlerInterface instance does not return a response
      */
-    public function __invoke(RequestEvent $event)
+    public function authenticate(RequestEvent $event)
     {
         $request = $event->getRequest();
-
-        if (!$this->requiresLogout($request)) {
-            return;
-        }
 
         if (null !== $this->csrfTokenManager) {
             $csrfToken = ParameterBagUtils::getRequestParameterValue($request, $this->options['csrf_parameter']);
@@ -114,10 +113,8 @@ class LogoutListener implements ListenerInterface
      * The default implementation only processed requests to a specific path,
      * but a subclass could change this to logout requests where
      * certain parameters is present.
-     *
-     * @return bool
      */
-    protected function requiresLogout(Request $request)
+    protected function requiresLogout(Request $request): bool
     {
         return isset($this->options['logout_path']) && $this->httpUtils->checkRequestPath($request, $this->options['logout_path']);
     }

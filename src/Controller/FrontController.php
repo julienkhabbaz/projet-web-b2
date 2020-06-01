@@ -2,159 +2,122 @@
 
 namespace App\Controller;
 
-
+use App\Entity\Commande;
+use App\Entity\Contact;
+use App\Entity\Plat;
 use App\Entity\Restaurant;
+use App\Form\CommandeType;
+use App\Notification\ContactNotification;
+use App\Repository\RestaurantRepository;
+use DateTime;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Security\Core\User\UserProviderInterface;
+use Symfony\Component\Security\Core\Security;
 
 class FrontController extends AbstractController
 {
 
-    private $users = null;
-    private $usersloggedin = false;
+    /**
+     * @var Security
+     */
+    private $security;
 
-    public function __construct()
+    public function __construct(Security $security)
     {
-        if (isset($_SESSION['users'])){
-            $this->users = $_SESSION['users'];
-            $this->usersloggedin = true;
-        }
+        $this->security = $security;
+    }
+    /**
+     * @Route("/", name="home")
+     */
+    public function index(RestaurantRepository $repository)
+    {
+
+        $restaurants = $repository->findLatest();
+        return $this->render('front/index.html.twig', [
+            'restaurants' => $restaurants
+        ]);
     }
 
     /**
-     * @Route("/", name="homepage")
+     * @Route("/restaurants", name="liste_restaurants")
      */
-    public function index()
+    public function ListRestaurant(RestaurantRepository $repository)
     {
-        $check = 1;
-        return $this->render('front/index.html.twig');
-    }
-
-    /**
-     * @Route("/FrontMenu", name="front_menu")
-     */
-    public function FrontMenu()
-    {
-        if ($this->usersloggedin){
-            $check = 1;
-            return $this->render('front/menu.html.twig',[
-                'Check' => $check
-            ]);
-        }else{
-            $check = 0;
-            return $this->render('front/menu.html.twig',[
-                'Check' => $check
-            ]);
-        }
-    }
-
-
-
-    /**
-     * @Route("/user/login", name="user_login_action")
-     */
-    public function UserLogin(Request $request)
-    {
-        $error = '';
-        if ($request->getMethod() == "POST") {
-            $email = $request->get('email');
-            $password = $request->get('password');
-//            $password = md5($pass);
-            $users = $this->getDoctrine()->getRepository(Restaurant::class)->findOneBy(
-                ['email' => $email, 'password' => $password]
-            );
-            if (!empty($users))
-            {
-                if (session_status() === PHP_SESSION_NONE){
-                    session_start();
-                }
-                $_SESSION['users'] = $users;
-                return $this->redirectToRoute('homepage');
-            }
-            $error = 'E-mail ou mot de passe incorrect!';
-            return $this->render('front/login.html.twig',
-                ['NotMatch' => $error]);
-        }
-        return $this->render('front/login.html.twig',
-            ['NotMatch' => $error]);
-    }
-
-
-    /**
-     * @Route("/Register", name="users_register")
-     */
-    public function UsersRegister(Request $request){
-        $error = '';
-        $success = '';
-        if ($request->getMethod() == "POST"){
-            $finduseremail = $this->getDoctrine()->getRepository(Restaurant::class)->findOneBy(
-                ['email' => $request->get('email')]
-            );
-            $findusername = $this->getDoctrine()->getRepository(Restaurant::class)->findOneBy(
-                ['name' => $request->get('name')]
-            );
-            if (!empty($findusername)){
-                $error = 'Le nom existe déjà!';
-                return $this->render('front/register.html.twig',
-                    ['Error' => $error, 'Success' => $success]
-                );
-            }
-            if (empty($finduseremail)){
-                $em = $this->getDoctrine()->getManager();
-                $rest = new Restaurant();
-                $info = pathinfo($_FILES['pic']['name']);
-                $ext = $info['extension'];
-                $date = date('mdYhisms', time());
-                $newname = $date . '.' . $ext;
-                $target = 'content/assets/restaurant/'.$newname;
-                move_uploaded_file( $_FILES['pic']['tmp_name'], "./".$target);
-                $rest->setLogo($target);
-
-                $rest->setName($request->get('name'));
-                $rest->setEmail($request->get('email'));
-                $rest->setAddress($request->get('address'));
-                $rest->setStatus(1);
-                $rest->setPassword($request->get('password'));
-                $em->persist($rest);
-                $em->flush();
-                $success = 'Enregistré avec succès!';
-                return $this->render('front/register.html.twig',
-                    ['Success' => $success, 'Error' => $error]
-                );
-            }
-            $error = "L'email existe déjà!";
-            return $this->render('front/register.html.twig',
-                ['Error' => $error, 'Success' => $success]
-            );
-        }
-        return $this->render('front/register.html.twig',
-            ['Error' => $error, 'Success' => $success]
-        );
-    }
-
-    /**
-     * @Route("/Users_Logout", name="users_logout")
-     */
-    public function Users_Logout()
-    {
-        session_unset();
-        session_destroy();
-        return $this->redirectToRoute('homepage');
-    }
-
-
-    /**
-     * @Route("/Restaurants", name="front_restaurants_list")
-     */
-    public function Front_Restaurants_LISt()
-    {
-        $rest = $this->getDoctrine()->getRepository(Restaurant::class)->findAll();
+        $restaurants = $repository->findAll();
         return $this->render('front/restaurants.html.twig', [
-            'Restaurants' => $rest
+            'restaurants' => $restaurants
+        ]);
+    }
+    /**
+     * @Route("restaurant/{id}", name="detail_restaurant", methods={"GET"})
+     */
+    public function show(Restaurant $restaurant): Response
+    {
+        return $this->render('front/show.html.twig', [
+            'restaurant' => $restaurant,
         ]);
     }
 
 
 
+
+    /**
+     * @Route("/commande/new/{id}", name="commander", methods={"GET","POST"})
+     */
+    public function Commander(Request $request, Plat $plat, ContactNotification $notification): Response
+    {
+
+
+        $this->denyAccessUnlessGranted('IS_AUTHENTICATED_FULLY');
+
+        $commande = new Commande();
+        $form = $this->createForm(CommandeType::class, $commande);
+        $form->handleRequest($request);
+
+        $user = $this->security->getUser();
+        if ($form->isSubmitted() && $form->isValid()) {
+
+
+
+
+            $prix = $plat->getPrix();
+            $qt = $commande->getQuantite();
+            $total =  $qt * ($prix + 2.5);
+
+
+
+            $commande->setRefCommande("REF_" . rand());
+            $commande->setStatus(0);
+            $commande->setTotal($total);
+            $commande->setPlat($plat);
+            $commande->setClient($user);
+            $commande->setDateCommande(new \DateTime('now'));
+            $commande->setHeureLivraison(new \DateTime('now'));
+            $entityManager = $this->getDoctrine()->getManager();
+            $entityManager->persist($commande);
+            $entityManager->flush();
+            $this->addFlash('success', 'Votre commande a bien été effectué');
+
+
+            $contact = new Contact();
+            $contact->setCommande($commande);
+
+            $contact->setUser($user);
+            $notification->notify($contact);
+
+
+
+            return $this->redirectToRoute('liste_restaurants');
+        }
+
+        return $this->render('front/commande.html.twig', [
+            'commande' => $commande,
+            'form' => $form->createView(),
+            'plat' => $plat
+        ]);
+    }
 }

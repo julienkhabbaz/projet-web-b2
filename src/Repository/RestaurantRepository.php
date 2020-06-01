@@ -4,7 +4,10 @@ namespace App\Repository;
 
 use App\Entity\Restaurant;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\Common\Persistence\ManagerRegistry;
+use Doctrine\Persistence\ManagerRegistry;
+
+use Doctrine\ORM\QueryBuilder;
+use Doctrine\ORM\Query;
 
 /**
  * @method Restaurant|null find($id, $lockMode = null, $lockVersion = null)
@@ -19,22 +22,49 @@ class RestaurantRepository extends ServiceEntityRepository
         parent::__construct($registry, Restaurant::class);
     }
 
-    // /**
-    //  * @return Restaurant[] Returns an array of Restaurant objects
-    //  */
-    /*
+
+    /**
+     * @return Restaurant[]
+     */
+    public function findLatest(): array
+    {
+        return $this->findVisibleQuery()
+            ->setMaxResults(4)
+            ->getQuery()
+            ->getResult();
+    }
+
+    private function findVisibleQuery(): QueryBuilder
+    {
+        return $this->createQueryBuilder('p');
+    }
+    /**
+     * @return Restaurant[] Returns an array of Restaurant objects
+     */
+
     public function findByExampleField($value)
     {
         return $this->createQueryBuilder('r')
-            ->andWhere('r.exampleField = :val')
+            ->andWhere('r.user = :val')
             ->setParameter('val', $value)
             ->orderBy('r.id', 'ASC')
-            ->setMaxResults(10)
+            // ->setMaxResults(10)
             ->getQuery()
-            ->getResult()
-        ;
+            ->getResult();
     }
-    */
+    public  function CountRestaurant()
+    {
+
+        $queryBuilder = $this->getEntityManager()->createQueryBuilder();
+
+        $queryBuilder->select('COUNT(r.id)')
+            ->from(Restaurant::class, 'r');
+
+        $query = $queryBuilder->getQuery();
+
+        return $query->getSingleScalarResult();
+    }
+
 
     /*
     public function findOneBySomeField($value): ?Restaurant

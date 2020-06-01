@@ -58,6 +58,9 @@ class ReflectionExtractor implements PropertyListExtractorInterface, PropertyTyp
     private $enableConstructorExtraction;
     private $accessFlags;
 
+    private $arrayMutatorPrefixesFirst;
+    private $arrayMutatorPrefixesLast;
+
     /**
      * @param string[]|null $mutatorPrefixes
      * @param string[]|null $accessorPrefixes
@@ -70,12 +73,15 @@ class ReflectionExtractor implements PropertyListExtractorInterface, PropertyTyp
         $this->arrayMutatorPrefixes = null !== $arrayMutatorPrefixes ? $arrayMutatorPrefixes : self::$defaultArrayMutatorPrefixes;
         $this->enableConstructorExtraction = $enableConstructorExtraction;
         $this->accessFlags = $accessFlags;
+
+        $this->arrayMutatorPrefixesFirst = array_merge($this->arrayMutatorPrefixes, array_diff($this->mutatorPrefixes, $this->arrayMutatorPrefixes));
+        $this->arrayMutatorPrefixesLast = array_reverse($this->arrayMutatorPrefixesFirst);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function getProperties($class, array $context = [])
+    public function getProperties(string $class, array $context = []): ?array
     {
         try {
             $reflectionClass = new \ReflectionClass($class);
@@ -131,7 +137,7 @@ class ReflectionExtractor implements PropertyListExtractorInterface, PropertyTyp
     /**
      * {@inheritdoc}
      */
-    public function getTypes($class, $property, array $context = [])
+    public function getTypes(string $class, string $property, array $context = []): ?array
     {
         if ($fromMutator = $this->extractFromMutator($class, $property)) {
             return $fromMutator;
@@ -158,7 +164,7 @@ class ReflectionExtractor implements PropertyListExtractorInterface, PropertyTyp
     /**
      * {@inheritdoc}
      */
-    public function isReadable($class, $property, array $context = [])
+    public function isReadable(string $class, string $property, array $context = []): ?bool
     {
         if ($this->isAllowedProperty($class, $property)) {
             return true;
@@ -172,7 +178,7 @@ class ReflectionExtractor implements PropertyListExtractorInterface, PropertyTyp
     /**
      * {@inheritdoc}
      */
-    public function isWritable($class, $property, array $context = [])
+    public function isWritable(string $class, string $property, array $context = []): ?bool
     {
         if ($this->isAllowedProperty($class, $property)) {
             return true;
@@ -294,7 +300,7 @@ class ReflectionExtractor implements PropertyListExtractorInterface, PropertyTyp
         return null;
     }
 
-    private function extractFromDefaultValue(string $class, string $property)
+    private function extractFromDefaultValue(string $class, string $property): ?array
     {
         try {
             $reflectionClass = new \ReflectionClass($class);
@@ -405,7 +411,9 @@ class ReflectionExtractor implements PropertyListExtractorInterface, PropertyTyp
         $ucProperty = ucfirst($property);
         $ucSingulars = (array) Inflector::singularize($ucProperty);
 
-        foreach ($this->mutatorPrefixes as $prefix) {
+        $mutatorPrefixes = \in_array($ucProperty, $ucSingulars, true) ? $this->arrayMutatorPrefixesLast : $this->arrayMutatorPrefixesFirst;
+
+        foreach ($mutatorPrefixes as $prefix) {
             $names = [$ucProperty];
             if (\in_array($prefix, $this->arrayMutatorPrefixes)) {
                 $names = array_merge($names, $ucSingulars);

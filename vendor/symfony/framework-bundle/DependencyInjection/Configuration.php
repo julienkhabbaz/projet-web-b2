@@ -19,6 +19,7 @@ use Symfony\Component\Asset\Package;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
+use Symfony\Component\Config\Definition\Exception\InvalidConfigurationException;
 use Symfony\Component\DependencyInjection\Exception\LogicException;
 use Symfony\Component\Form\Form;
 use Symfony\Component\HttpClient\HttpClient;
@@ -27,8 +28,8 @@ use Symfony\Component\Lock\Lock;
 use Symfony\Component\Lock\Store\SemaphoreStore;
 use Symfony\Component\Mailer\Mailer;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Notifier\Notifier;
 use Symfony\Component\PropertyInfo\PropertyInfoExtractorInterface;
-use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Serializer\Serializer;
 use Symfony\Component\Translation\Translator;
 use Symfony\Component\Validator\Validation;
@@ -84,6 +85,9 @@ class Configuration implements ConfigurationInterface
                     ->beforeNormalization()->ifString()->then(function ($v) { return [$v]; })->end()
                     ->prototype('scalar')->end()
                 ->end()
+                ->scalarNode('error_controller')
+                    ->defaultValue('error_controller')
+                ->end()
             ->end()
         ;
 
@@ -97,7 +101,6 @@ class Configuration implements ConfigurationInterface
         $this->addRouterSection($rootNode);
         $this->addSessionSection($rootNode);
         $this->addRequestSection($rootNode);
-        $this->addTemplatingSection($rootNode);
         $this->addAssetsSection($rootNode);
         $this->addTranslatorSection($rootNode);
         $this->addValidationSection($rootNode);
@@ -113,8 +116,26 @@ class Configuration implements ConfigurationInterface
         $this->addRobotsIndexSection($rootNode);
         $this->addHttpClientSection($rootNode);
         $this->addMailerSection($rootNode);
+        $this->addSecretsSection($rootNode);
+        $this->addNotifierSection($rootNode);
 
         return $treeBuilder;
+    }
+
+    private function addSecretsSection(ArrayNodeDefinition $rootNode)
+    {
+        $rootNode
+            ->children()
+                ->arrayNode('secrets')
+                    ->canBeDisabled()
+                    ->children()
+                        ->scalarNode('vault_directory')->defaultValue('%kernel.project_dir%/config/secrets/%kernel.environment%')->cannotBeEmpty()->end()
+                        ->scalarNode('local_dotenv_file')->defaultValue('%kernel.project_dir%/.env.%kernel.environment%.local')->end()
+                        ->scalarNode('decryption_env_var')->defaultValue('base64:default::SYMFONY_DECRYPTION_SECRET')->end()
+                    ->end()
+                ->end()
+            ->end()
+        ;
     }
 
     private function addCsrfSection(ArrayNodeDefinition $rootNode)
@@ -258,15 +279,6 @@ class Configuration implements ConfigurationInterface
                         ->arrayNode('workflows')
                             ->useAttributeAsKey('name')
                             ->prototype('array')
-                                ->beforeNormalization()
-                                    ->always(function ($v) {
-                                        if (isset($v['initial_place'])) {
-                                            $v['initial_marking'] = [$v['initial_place']];
-                                        }
-
-                                        return $v;
-                                    })
-                                ->end()
                                 ->fixXmlConfig('support')
                                 ->fixXmlConfig('place')
                                 ->fixXmlConfig('transition')
@@ -279,43 +291,16 @@ class Configuration implements ConfigurationInterface
                                         ->defaultValue('state_machine')
                                     ->end()
                                     ->arrayNode('marking_store')
-                                        ->fixXmlConfig('argument')
                                         ->children()
                                             ->enumNode('type')
-                                                ->values(['multiple_state', 'single_state', 'method'])
-                                                ->validate()
-                                                    ->ifTrue(function ($v) { return 'method' !== $v; })
-                                                    ->then(function ($v) {
-                                                        @trigger_error('Passing something else than "method" has been deprecated in Symfony 4.3.', E_USER_DEPRECATED);
-
-                                                        return $v;
-                                                    })
-                                                ->end()
-                                            ->end()
-                                            ->arrayNode('arguments')
-                                                ->setDeprecated('The "%path%.%node%" configuration key has been deprecated in Symfony 4.3. Use "property" instead.')
-                                                ->beforeNormalization()
-                                                    ->ifString()
-                                                    ->then(function ($v) { return [$v]; })
-                                                ->end()
-                                                ->requiresAtLeastOneElement()
-                                                ->prototype('scalar')
-                                                ->end()
+                                                ->values(['method'])
                                             ->end()
                                             ->scalarNode('property')
-                                                ->defaultNull() // In Symfony 5.0, set "marking" as default property
+                                                ->defaultValue('marking')
                                             ->end()
                                             ->scalarNode('service')
                                                 ->cannotBeEmpty()
                                             ->end()
-                                        ->end()
-                                        ->validate()
-                                            ->ifTrue(function ($v) { return isset($v['type']) && isset($v['service']); })
-                                            ->thenInvalid('"type" and "service" cannot be used together.')
-                                        ->end()
-                                        ->validate()
-                                            ->ifTrue(function ($v) { return !empty($v['arguments']) && isset($v['service']); })
-                                            ->thenInvalid('"arguments" and "service" cannot be used together.')
                                         ->end()
                                     ->end()
                                     ->arrayNode('supports')
@@ -333,10 +318,6 @@ class Configuration implements ConfigurationInterface
                                     ->end()
                                     ->scalarNode('support_strategy')
                                         ->cannotBeEmpty()
-                                    ->end()
-                                    ->scalarNode('initial_place')
-                                        ->setDeprecated('The "%path%.%node%" configuration key has been deprecated in Symfony 4.3, use the "initial_marking" configuration key instead.')
-                                        ->defaultNull()
                                     ->end()
                                     ->arrayNode('initial_marking')
                                         ->beforeNormalization()->castToArray()->end()
@@ -471,24 +452,6 @@ class Configuration implements ConfigurationInterface
                                     })
                                     ->thenInvalid('"supports" or "support_strategy" should be configured.')
                                 ->end()
-                                ->validate()
-                                    ->ifTrue(function ($v) {
-                                        return 'workflow' === $v['type'] && 'single_state' === ($v['marking_store']['type'] ?? false);
-                                    })
-                                    ->then(function ($v) {
-                                        @trigger_error('Using a workflow with type=workflow and a marking_store=single_state is deprecated since Symfony 4.3. Use type=state_machine instead.', E_USER_DEPRECATED);
-
-                                        return $v;
-                                    })
-                                ->end()
-                                ->validate()
-                                    ->ifTrue(function ($v) {
-                                        return isset($v['marking_store']['property'])
-                                            && (!isset($v['marking_store']['type']) || 'method' !== $v['marking_store']['type'])
-                                        ;
-                                    })
-                                    ->thenInvalid('"property" option is only supported by the "method" marking store.')
-                                ->end()
                             ->end()
                         ->end()
                     ->end()
@@ -590,73 +553,9 @@ class Configuration implements ConfigurationInterface
                                     ->ifTrue(function ($v) { return \is_array($v) && isset($v['mime_type']); })
                                     ->then(function ($v) { return $v['mime_type']; })
                                 ->end()
-                                ->beforeNormalization()
-                                    ->ifTrue(function ($v) { return !\is_array($v); })
-                                    ->then(function ($v) { return [$v]; })
-                                ->end()
+                                ->beforeNormalization()->castToArray()->end()
                                 ->prototype('scalar')->end()
                             ->end()
-                        ->end()
-                    ->end()
-                ->end()
-            ->end()
-        ;
-    }
-
-    private function addTemplatingSection(ArrayNodeDefinition $rootNode)
-    {
-        $rootNode
-            ->children()
-                ->arrayNode('templating')
-                    ->info('templating configuration')
-                    ->canBeEnabled()
-                    ->setDeprecated('The "%path%.%node%" configuration is deprecated since Symfony 4.3. Configure the "twig" section provided by the Twig Bundle instead.')
-                    ->beforeNormalization()
-                        ->ifTrue(function ($v) { return false === $v || \is_array($v) && false === $v['enabled']; })
-                        ->then(function () { return ['enabled' => false, 'engines' => false]; })
-                    ->end()
-                    ->children()
-                        ->scalarNode('hinclude_default_template')->setDeprecated('Setting "templating.hinclude_default_template" is deprecated since Symfony 4.3, use "fragments.hinclude_default_template" instead.')->defaultNull()->end()
-                        ->scalarNode('cache')->end()
-                        ->arrayNode('form')
-                            ->addDefaultsIfNotSet()
-                            ->fixXmlConfig('resource')
-                            ->children()
-                                ->arrayNode('resources')
-                                    ->addDefaultChildrenIfNoneSet()
-                                    ->prototype('scalar')->defaultValue('FrameworkBundle:Form')->end()
-                                    ->validate()
-                                        ->ifTrue(function ($v) {return !\in_array('FrameworkBundle:Form', $v); })
-                                        ->then(function ($v) {
-                                            return array_merge(['FrameworkBundle:Form'], $v);
-                                        })
-                                    ->end()
-                                ->end()
-                            ->end()
-                        ->end()
-                    ->end()
-                    ->fixXmlConfig('engine')
-                    ->children()
-                        ->arrayNode('engines')
-                            ->example(['twig'])
-                            ->isRequired()
-                            ->requiresAtLeastOneElement()
-                            ->canBeUnset()
-                            ->beforeNormalization()
-                                ->ifTrue(function ($v) { return !\is_array($v) && false !== $v; })
-                                ->then(function ($v) { return [$v]; })
-                            ->end()
-                            ->prototype('scalar')->end()
-                        ->end()
-                    ->end()
-                    ->fixXmlConfig('loader')
-                    ->children()
-                        ->arrayNode('loaders')
-                            ->beforeNormalization()
-                                ->ifTrue(function ($v) { return !\is_array($v); })
-                                ->then(function ($v) { return [$v]; })
-                             ->end()
-                            ->prototype('scalar')->end()
                         ->end()
                     ->end()
                 ->end()
@@ -680,10 +579,7 @@ class Configuration implements ConfigurationInterface
                         ->scalarNode('base_path')->defaultValue('')->end()
                         ->arrayNode('base_urls')
                             ->requiresAtLeastOneElement()
-                            ->beforeNormalization()
-                                ->ifTrue(function ($v) { return !\is_array($v); })
-                                ->then(function ($v) { return [$v]; })
-                            ->end()
+                            ->beforeNormalization()->castToArray()->end()
                             ->prototype('scalar')->end()
                         ->end()
                     ->end()
@@ -725,10 +621,7 @@ class Configuration implements ConfigurationInterface
                                     ->scalarNode('base_path')->defaultValue('')->end()
                                     ->arrayNode('base_urls')
                                         ->requiresAtLeastOneElement()
-                                        ->beforeNormalization()
-                                            ->ifTrue(function ($v) { return !\is_array($v); })
-                                            ->then(function ($v) { return [$v]; })
-                                        ->end()
+                                        ->beforeNormalization()->castToArray()->end()
                                         ->prototype('scalar')->end()
                                     ->end()
                                 ->end()
@@ -769,12 +662,14 @@ class Configuration implements ConfigurationInterface
                     ->fixXmlConfig('path')
                     ->children()
                         ->arrayNode('fallbacks')
+                            ->info('Defaults to the value of "default_locale".')
                             ->beforeNormalization()->ifString()->then(function ($v) { return [$v]; })->end()
                             ->prototype('scalar')->end()
-                            ->defaultValue(['en'])
+                            ->defaultValue([])
                         ->end()
                         ->booleanNode('logging')->defaultValue(false)->end()
                         ->scalarNode('formatter')->defaultValue('translator.formatter.default')->end()
+                        ->scalarNode('cache_dir')->defaultValue('%kernel.cache_dir%/translations')->end()
                         ->scalarNode('default_path')
                             ->info('The default path used to load translations')
                             ->defaultValue('%kernel.project_dir%/translations')
@@ -795,27 +690,6 @@ class Configuration implements ConfigurationInterface
                 ->arrayNode('validation')
                     ->info('validation configuration')
                     ->{!class_exists(FullStack::class) && class_exists(Validation::class) ? 'canBeDisabled' : 'canBeEnabled'}()
-                    ->validate()
-                        ->ifTrue(function ($v) { return isset($v['strict_email']) && isset($v['email_validation_mode']); })
-                        ->thenInvalid('"strict_email" and "email_validation_mode" cannot be used together.')
-                    ->end()
-                    ->beforeNormalization()
-                        ->ifTrue(function ($v) { return isset($v['strict_email']); })
-                        ->then(function ($v) {
-                            @trigger_error('The "framework.validation.strict_email" configuration key has been deprecated in Symfony 4.1. Use the "framework.validation.email_validation_mode" configuration key instead.', E_USER_DEPRECATED);
-
-                            return $v;
-                        })
-                    ->end()
-                    ->beforeNormalization()
-                        ->ifTrue(function ($v) { return isset($v['strict_email']) && !isset($v['email_validation_mode']); })
-                        ->then(function ($v) {
-                            $v['email_validation_mode'] = $v['strict_email'] ? 'strict' : 'loose';
-                            unset($v['strict_email']);
-
-                            return $v;
-                        })
-                    ->end()
                     ->children()
                         ->scalarNode('cache')->end()
                         ->booleanNode('enable_annotations')->{!class_exists(FullStack::class) && class_exists(Annotation::class) ? 'defaultTrue' : 'defaultFalse'}()->end()
@@ -823,13 +697,9 @@ class Configuration implements ConfigurationInterface
                             ->defaultValue(['loadValidatorMetadata'])
                             ->prototype('scalar')->end()
                             ->treatFalseLike([])
-                            ->validate()
-                                ->ifTrue(function ($v) { return !\is_array($v); })
-                                ->then(function ($v) { return (array) $v; })
-                            ->end()
+                            ->validate()->castToArray()->end()
                         ->end()
                         ->scalarNode('translation_domain')->defaultValue('validators')->end()
-                        ->booleanNode('strict_email')->end()
                         ->enumNode('email_validation_mode')->values(['html5', 'loose', 'strict'])->end()
                         ->arrayNode('mapping')
                             ->addDefaultsIfNotSet()
@@ -854,6 +724,11 @@ class Configuration implements ConfigurationInterface
                             ->end()
                         ->end()
                         ->arrayNode('auto_mapping')
+                            ->info('A collection of namespaces for which auto-mapping will be enabled by default, or null to opt-in with the EnableAutoMapping constraint.')
+                            ->example([
+                                'App\\Entity\\' => [],
+                                'App\\WithSpecificLoaders\\' => ['validator.property_info_loader'],
+                            ])
                             ->useAttributeAsKey('namespace')
                             ->normalizeKeys(false)
                             ->beforeNormalization()
@@ -1001,8 +876,39 @@ class Configuration implements ConfigurationInterface
                         ->arrayNode('pools')
                             ->useAttributeAsKey('name')
                             ->prototype('array')
+                                ->fixXmlConfig('adapter')
+                                ->beforeNormalization()
+                                    ->ifTrue(function ($v) { return (isset($v['adapters']) || \is_array($v['adapter'] ?? null)) && isset($v['provider']); })
+                                    ->thenInvalid('Pool cannot have a "provider" while "adapter" is set to a map')
+                                ->end()
                                 ->children()
-                                    ->scalarNode('adapter')->defaultValue('cache.app')->end()
+                                    ->arrayNode('adapters')
+                                        ->performNoDeepMerging()
+                                        ->info('One or more adapters to chain for creating the pool, defaults to "cache.app".')
+                                        ->beforeNormalization()
+                                            ->always()->then(function ($values) {
+                                                if ([0] === array_keys($values) && \is_array($values[0])) {
+                                                    return $values[0];
+                                                }
+                                                $adapters = [];
+
+                                                foreach ($values as $k => $v) {
+                                                    if (\is_int($k) && \is_string($v)) {
+                                                        $adapters[] = $v;
+                                                    } elseif (!\is_array($v)) {
+                                                        $adapters[$k] = $v;
+                                                    } elseif (isset($v['provider'])) {
+                                                        $adapters[$v['provider']] = $v['name'] ?? $v;
+                                                    } else {
+                                                        $adapters[] = $v['name'] ?? $v;
+                                                    }
+                                                }
+
+                                                return $adapters;
+                                            })
+                                        ->end()
+                                        ->prototype('scalar')->end()
+                                    ->end()
                                     ->scalarNode('tags')->defaultNull()->end()
                                     ->booleanNode('public')->defaultFalse()->end()
                                     ->integerNode('default_lifetime')->end()
@@ -1136,6 +1042,10 @@ class Configuration implements ConfigurationInterface
                         ->ifTrue(function ($v) { return isset($v['buses']) && \count($v['buses']) > 1 && null === $v['default_bus']; })
                         ->thenInvalid('You must specify the "default_bus" if you define more than one bus.')
                     ->end()
+                    ->validate()
+                        ->ifTrue(static function ($v): bool { return isset($v['buses']) && null !== $v['default_bus'] && !isset($v['buses'][$v['default_bus']]); })
+                        ->then(static function (array $v): void { throw new InvalidConfigurationException(sprintf('The specified default bus "%s" is not configured. Available buses are "%s".', $v['default_bus'], implode('", "', array_keys($v['buses'])))); })
+                    ->end()
                     ->children()
                         ->arrayNode('routing')
                             ->normalizeKeys(false)
@@ -1145,6 +1055,10 @@ class Configuration implements ConfigurationInterface
                                 ->then(function ($config) {
                                     if (!\is_array($config)) {
                                         return [];
+                                    }
+                                    // If XML config with only one routing attribute
+                                    if (2 === \count($config) && isset($config['message-class']) && isset($config['sender'])) {
+                                        $config = [0 => $config];
                                     }
 
                                     $newConfig = [];
@@ -1167,6 +1081,7 @@ class Configuration implements ConfigurationInterface
                                 })
                             ->end()
                             ->prototype('array')
+                                ->performNoDeepMerging()
                                 ->children()
                                     ->arrayNode('senders')
                                         ->requiresAtLeastOneElement()
@@ -1256,6 +1171,7 @@ class Configuration implements ConfigurationInterface
                                         ->defaultTrue()
                                     ->end()
                                     ->arrayNode('middleware')
+                                        ->performNoDeepMerging()
                                         ->beforeNormalization()
                                             ->ifTrue(function ($v) { return \is_string($v) || (\is_array($v) && !\is_int(key($v))); })
                                             ->then(function ($v) { return [$v]; })
@@ -1349,7 +1265,7 @@ class Configuration implements ConfigurationInterface
                                             if (!\is_array($config)) {
                                                 return [];
                                             }
-                                            if (!isset($config['host'])) {
+                                            if (!isset($config['host'], $config['value']) || \count($config) > 2) {
                                                 return $config;
                                             }
 
@@ -1367,6 +1283,9 @@ class Configuration implements ConfigurationInterface
                                 ->end()
                                 ->floatNode('timeout')
                                     ->info('The idle timeout, defaults to the "default_socket_timeout" ini parameter.')
+                                ->end()
+                                ->floatNode('max_duration')
+                                    ->info('The maximum execution time for the request+response as a whole.')
                                 ->end()
                                 ->scalarNode('bindto')
                                     ->info('A network interface name, IP address, a host name or a UNIX socket to bind to.')
@@ -1426,7 +1345,7 @@ class Configuration implements ConfigurationInterface
                                     ->thenInvalid('Either "scope" or "base_uri" should be defined.')
                                 ->end()
                                 ->validate()
-                                    ->ifTrue(function ($v) { return isset($v['query']) && !isset($v['base_uri']); })
+                                    ->ifTrue(function ($v) { return !empty($v['query']) && !isset($v['base_uri']); })
                                     ->thenInvalid('"query" applies to "base_uri" but no base URI is defined.')
                                 ->end()
                                 ->children()
@@ -1444,6 +1363,9 @@ class Configuration implements ConfigurationInterface
                                     ->scalarNode('auth_bearer')
                                         ->info('A token enabling HTTP Bearer authorization.')
                                     ->end()
+                                    ->scalarNode('auth_ntlm')
+                                        ->info('A "username:password" pair to use Microsoft NTLM authentication (requires the cURL extension).')
+                                    ->end()
                                     ->arrayNode('query')
                                         ->info('Associative array of query string values merged with the base URI.')
                                         ->useAttributeAsKey('key')
@@ -1452,7 +1374,7 @@ class Configuration implements ConfigurationInterface
                                                 if (!\is_array($config)) {
                                                     return [];
                                                 }
-                                                if (!isset($config['key'])) {
+                                                if (!isset($config['key'], $config['value']) || \count($config) > 2) {
                                                     return $config;
                                                 }
 
@@ -1482,7 +1404,7 @@ class Configuration implements ConfigurationInterface
                                                 if (!\is_array($config)) {
                                                     return [];
                                                 }
-                                                if (!isset($config['host'])) {
+                                                if (!isset($config['host'], $config['value']) || \count($config) > 2) {
                                                     return $config;
                                                 }
 
@@ -1500,6 +1422,9 @@ class Configuration implements ConfigurationInterface
                                     ->end()
                                     ->floatNode('timeout')
                                         ->info('The idle timeout, defaults to the "default_socket_timeout" ini parameter.')
+                                    ->end()
+                                    ->floatNode('max_duration')
+                                        ->info('The maximum execution time for the request+response as a whole.')
                                     ->end()
                                     ->scalarNode('bindto')
                                         ->info('A network interface name, IP address, a host name or a UNIX socket to bind to.')
@@ -1553,8 +1478,82 @@ class Configuration implements ConfigurationInterface
                 ->arrayNode('mailer')
                     ->info('Mailer configuration')
                     ->{!class_exists(FullStack::class) && class_exists(Mailer::class) ? 'canBeDisabled' : 'canBeEnabled'}()
+                    ->validate()
+                        ->ifTrue(function ($v) { return isset($v['dsn']) && \count($v['transports']); })
+                        ->thenInvalid('"dsn" and "transports" cannot be used together.')
+                    ->end()
+                    ->fixXmlConfig('transport')
                     ->children()
-                        ->scalarNode('dsn')->defaultValue('smtp://null')->end()
+                        ->scalarNode('dsn')->defaultNull()->end()
+                        ->arrayNode('transports')
+                            ->useAttributeAsKey('name')
+                            ->prototype('scalar')->end()
+                        ->end()
+                        ->arrayNode('envelope')
+                            ->info('Mailer Envelope configuration')
+                            ->children()
+                                ->scalarNode('sender')->end()
+                                ->arrayNode('recipients')
+                                    ->performNoDeepMerging()
+                                    ->beforeNormalization()
+                                    ->ifArray()
+                                        ->then(function ($v) {
+                                            return array_filter(array_values($v));
+                                        })
+                                    ->end()
+                                    ->prototype('scalar')->end()
+                                ->end()
+                            ->end()
+                        ->end()
+                    ->end()
+                ->end()
+            ->end()
+        ;
+    }
+
+    private function addNotifierSection(ArrayNodeDefinition $rootNode)
+    {
+        $rootNode
+            ->children()
+                ->arrayNode('notifier')
+                    ->info('Notifier configuration')
+                    ->{!class_exists(FullStack::class) && class_exists(Notifier::class) ? 'canBeDisabled' : 'canBeEnabled'}()
+                    ->fixXmlConfig('chatter_transport')
+                    ->children()
+                        ->arrayNode('chatter_transports')
+                            ->useAttributeAsKey('name')
+                            ->prototype('scalar')->end()
+                        ->end()
+                    ->end()
+                    ->fixXmlConfig('texter_transport')
+                    ->children()
+                        ->arrayNode('texter_transports')
+                            ->useAttributeAsKey('name')
+                            ->prototype('scalar')->end()
+                        ->end()
+                    ->end()
+                    ->children()
+                        ->booleanNode('notification_on_failed_messages')->defaultFalse()->end()
+                    ->end()
+                    ->children()
+                        ->arrayNode('channel_policy')
+                            ->useAttributeAsKey('name')
+                            ->prototype('array')
+                                ->beforeNormalization()->ifString()->then(function (string $v) { return [$v]; })->end()
+                                ->prototype('scalar')->end()
+                            ->end()
+                        ->end()
+                    ->end()
+                    ->fixXmlConfig('admin_recipient')
+                    ->children()
+                        ->arrayNode('admin_recipients')
+                            ->prototype('array')
+                                ->children()
+                                    ->scalarNode('email')->cannotBeEmpty()->end()
+                                    ->scalarNode('phone')->defaultValue('')->end()
+                                ->end()
+                            ->end()
+                        ->end()
                     ->end()
                 ->end()
             ->end()

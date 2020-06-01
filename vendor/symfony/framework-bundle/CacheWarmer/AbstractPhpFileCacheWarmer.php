@@ -43,7 +43,7 @@ abstract class AbstractPhpFileCacheWarmer implements CacheWarmerInterface
     /**
      * {@inheritdoc}
      */
-    public function warmUp($cacheDir)
+    public function warmUp(string $cacheDir)
     {
         $arrayAdapter = new ArrayAdapter();
 
@@ -72,7 +72,7 @@ abstract class AbstractPhpFileCacheWarmer implements CacheWarmerInterface
     /**
      * @internal
      */
-    final protected function ignoreAutoloadException($class, \Exception $exception)
+    final protected function ignoreAutoloadException(string $class, \Exception $exception): void
     {
         try {
             ClassExistenceResource::throwOnRequiredClass($class, $exception);
@@ -81,9 +81,7 @@ abstract class AbstractPhpFileCacheWarmer implements CacheWarmerInterface
     }
 
     /**
-     * @param string $cacheDir
-     *
      * @return bool false if there is nothing to warm-up
      */
-    abstract protected function doWarmUp($cacheDir, ArrayAdapter $arrayAdapter);
+    abstract protected function doWarmUp(string $cacheDir, ArrayAdapter $arrayAdapter);
 }

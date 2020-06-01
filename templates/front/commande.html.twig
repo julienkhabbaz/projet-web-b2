@@ -1,0 +1,93 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Commander{% endblock %}
+
+{% block body %}
+{#<div 
+    <h1>Nouvelle Commande</h1>
+    Libele {{ plat.libele }}</br>
+    Prix {{ plat.prix }}
+
+    {{ include('front/_form_commande.html.twig') }}#}
+
+
+<script src="//netdna.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+<script src="//code.jquery.com/jquery-1.11.1.min.js"></script>
+<style>
+.table>tbody>tr>td, .table>tfoot>tr>td{
+    vertical-align: middle;
+}
+@media screen and (max-width: 600px) {
+    table#cart tbody td .form-control{
+		width:20%;
+		display: inline !important;
+	}
+	.actions .btn{
+		width:36%;
+		margin:1.5em 0;
+	}
+	
+	.actions .btn-info{
+		float:left;
+	}
+	.actions .btn-danger{
+		float:right;
+	}
+	
+	table#cart thead { display: none; }
+	table#cart tbody td { display: block; padding: .6rem; min-width:320px;}
+	table#cart tbody tr td:first-child { background: #333; color: #fff; }
+	table#cart tbody td:before {
+		content: attr(data-th); font-weight: bold;
+		display: inline-block; width: 8rem;
+	}
+	
+	
+	
+	table#cart tfoot td{display:block; }
+	table#cart tfoot td .btn{display:block;}
+	
+}
+</style>
+<div class="container">
+	<table id="cart" class="table table-hover table-condensed">
+    				<thead>
+						<tr>
+							<th style="width:50%">Plat</th>
+							<th style="width:10%">Prix</th>
+							<th style="width:8%">Quantité</th>
+							<th style="width:22%" class="text-center">Frais Livraison</th>
+							<th style="width:10%"></th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td data-th="Product">
+								<div class="row">
+									<div class="col-sm-10 hidden-xs">
+									   {% if plat.filename %}
+									<img src="{{ vich_uploader_asset(plat,'imageFile')  | imagine_filter('thumb')}}"  class="img-responsive" alt="card-img-top" style="width: 50; height:auto;">
+               							 {% else %}
+									<img src="{{ '/images/restaurants/empty.png' | imagine_filter('thumb') }}"  class="img-responsive" alt="Logo" style="width: 50px; height:60px;">
+               							 {% endif %}
+									
+									</div>
+									<div class="col-sm-8 mt-2">
+										<h4 class="nomargin">{{plat.libele}}</h4>
+										<p>{{plat.description}}</p>
+									</div>
+								</div>
+							</td>
+							<td data-th="Price">{{plat.formattedPrice}} €</td>
+
+
+							
+                                 {{ include('front/_form_commande.html.twig') }}
+
+					
+			
+				</table>
+
+</div
+
+{% endblock %}

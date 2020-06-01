@@ -47,10 +47,7 @@ class FormFactoryBuilder implements FormFactoryBuilderInterface
      */
     private $typeGuessers = [];
 
-    /**
-     * @param bool $forceCoreExtension
-     */
-    public function __construct($forceCoreExtension = false)
+    public function __construct(bool $forceCoreExtension = false)
     {
         $this->forceCoreExtension = $forceCoreExtension;
     }
@@ -112,12 +109,8 @@ class FormFactoryBuilder implements FormFactoryBuilderInterface
      */
     public function addTypeExtension(FormTypeExtensionInterface $typeExtension)
     {
-        if (method_exists($typeExtension, 'getExtendedTypes')) {
-            foreach ($typeExtension::getExtendedTypes() as $extendedType) {
-                $this->typeExtensions[$extendedType][] = $typeExtension;
-            }
-        } else {
-            $this->typeExtensions[$typeExtension->getExtendedType()][] = $typeExtension;
+        foreach ($typeExtension::getExtendedTypes() as $extendedType) {
+            $this->typeExtensions[$extendedType][] = $typeExtension;
         }
 
         return $this;

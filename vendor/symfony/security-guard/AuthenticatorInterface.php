@@ -83,9 +83,8 @@ interface AuthenticatorInterface extends AuthenticationEntryPointInterface
     /**
      * Returns true if the credentials are valid.
      *
-     * If any value other than true is returned, authentication will
-     * fail. You may also throw an AuthenticationException if you wish
-     * to cause authentication to fail.
+     * If false is returned, authentication will fail. You may also throw
+     * an AuthenticationException if you wish to cause authentication to fail.
      *
      * The *credentials* are the return value from getCredentials()
      *
@@ -106,17 +105,15 @@ interface AuthenticatorInterface extends AuthenticationEntryPointInterface
      *
      * @see AbstractGuardAuthenticator
      *
-     * @param string $providerKey The provider (i.e. firewall) key
-     *
      * @return GuardTokenInterface
      */
-    public function createAuthenticatedToken(UserInterface $user, $providerKey);
+    public function createAuthenticatedToken(UserInterface $user, string $providerKey);
 
     /**
      * Called when authentication executed, but failed (e.g. wrong username password).
      *
      * This should return the Response sent back to the user, like a
-     * RedirectResponse to the login page or a 403 response.
+     * RedirectResponse to the login page or a 401 response.
      *
      * If you return null, the request will continue, but the user will
      * not be authenticated. This is probably not what you want to do.
@@ -134,11 +131,9 @@ interface AuthenticatorInterface extends AuthenticationEntryPointInterface
      * If you return null, the current request will continue, and the user
      * will be authenticated. This makes sense, for example, with an API.
      *
-     * @param string $providerKey The provider (i.e. firewall) key
-     *
      * @return Response|null
      */
-    public function onAuthenticationSuccess(Request $request, TokenInterface $token, $providerKey);
+    public function onAuthenticationSuccess(Request $request, TokenInterface $token, string $providerKey);
 
     /**
      * Does this method support remember me cookies?

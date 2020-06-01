@@ -35,8 +35,7 @@ abstract class AbstractDoctrineExtension extends Extension
     protected $drivers = [];
 
     /**
-     * @param array            $objectManager A configured object manager
-     * @param ContainerBuilder $container     A ContainerBuilder instance
+     * @param array $objectManager A configured object manager
      *
      * @throws \InvalidArgumentException
      */
@@ -101,11 +100,8 @@ abstract class AbstractDoctrineExtension extends Extension
      * Register the alias for this mapping driver.
      *
      * Aliases can be used in the Query languages of all the Doctrine object managers to simplify writing tasks.
-     *
-     * @param array  $mappingConfig
-     * @param string $mappingName
      */
-    protected function setMappingDriverAlias($mappingConfig, $mappingName)
+    protected function setMappingDriverAlias(array $mappingConfig, string $mappingName)
     {
         if (isset($mappingConfig['alias'])) {
             $this->aliasMap[$mappingConfig['alias']] = $mappingConfig['prefix'];
@@ -117,11 +113,9 @@ abstract class AbstractDoctrineExtension extends Extension
     /**
      * Register the mapping driver configuration for later use with the object managers metadata driver chain.
      *
-     * @param string $mappingName
-     *
      * @throws \InvalidArgumentException
      */
-    protected function setMappingDriverConfig(array $mappingConfig, $mappingName)
+    protected function setMappingDriverConfig(array $mappingConfig, string $mappingName)
     {
         $mappingDirectory = $mappingConfig['dir'];
         if (!is_dir($mappingDirectory)) {
@@ -170,17 +164,14 @@ abstract class AbstractDoctrineExtension extends Extension
 
     /**
      * Register all the collected mapping information with the object manager by registering the appropriate mapping drivers.
-     *
-     * @param array            $objectManager
-     * @param ContainerBuilder $container     A ContainerBuilder instance
      */
-    protected function registerMappingDrivers($objectManager, ContainerBuilder $container)
+    protected function registerMappingDrivers(array $objectManager, ContainerBuilder $container)
     {
         // configure metadata driver for each bundle based on the type of mapping files found
         if ($container->hasDefinition($this->getObjectManagerElementName($objectManager['name'].'_metadata_driver'))) {
             $chainDriverDef = $container->getDefinition($this->getObjectManagerElementName($objectManager['name'].'_metadata_driver'));
         } else {
-            $chainDriverDef = new Definition('%'.$this->getObjectManagerElementName('metadata.driver_chain.class%'));
+            $chainDriverDef = new Definition($this->getMetadataDriverClass('driver_chain'));
             $chainDriverDef->setPublic(false);
         }
 
@@ -196,12 +187,12 @@ abstract class AbstractDoctrineExtension extends Extension
                 }
                 $mappingDriverDef->setArguments($args);
             } elseif ('annotation' == $driverType) {
-                $mappingDriverDef = new Definition('%'.$this->getObjectManagerElementName('metadata.'.$driverType.'.class%'), [
+                $mappingDriverDef = new Definition($this->getMetadataDriverClass($driverType), [
                     new Reference($this->getObjectManagerElementName('metadata.annotation_reader')),
                     array_values($driverPaths),
                 ]);
             } else {
-                $mappingDriverDef = new Definition('%'.$this->getObjectManagerElementName('metadata.'.$driverType.'.class%'), [
+                $mappingDriverDef = new Definition($this->getMetadataDriverClass($driverType), [
                     array_values($driverPaths),
                 ]);
             }
@@ -224,11 +215,9 @@ abstract class AbstractDoctrineExtension extends Extension
     /**
      * Assertion if the specified mapping information is valid.
      *
-     * @param string $objectManagerName
-     *
      * @throws \InvalidArgumentException
      */
-    protected function assertValidMappingConfiguration(array $mappingConfig, $objectManagerName)
+    protected function assertValidMappingConfiguration(array $mappingConfig, string $objectManagerName)
     {
         if (!$mappingConfig['type'] || !$mappingConfig['dir'] || !$mappingConfig['prefix']) {
             throw new \InvalidArgumentException(sprintf('Mapping definitions for Doctrine manager "%s" require at least the "type", "dir" and "prefix" options.', $objectManagerName));
@@ -239,23 +228,16 @@ abstract class AbstractDoctrineExtension extends Extension
         }
 
         if (!\in_array($mappingConfig['type'], ['xml', 'yml', 'annotation', 'php', 'staticphp'])) {
-            throw new \InvalidArgumentException(sprintf('Can only configure "xml", "yml", "annotation", "php" or '.
-                '"staticphp" through the DoctrineBundle. Use your own bundle to configure other metadata drivers. '.
-                'You can register them by adding a new driver to the '.
-                '"%s" service definition.', $this->getObjectManagerElementName($objectManagerName.'_metadata_driver')
-            ));
+            throw new \InvalidArgumentException(sprintf('Can only configure "xml", "yml", "annotation", "php" or "staticphp" through the DoctrineBundle. Use your own bundle to configure other metadata drivers. You can register them by adding a new driver to the "%s" service definition.', $this->getObjectManagerElementName($objectManagerName.'_metadata_driver')));
         }
     }
 
     /**
      * Detects what metadata driver to use for the supplied directory.
      *
-     * @param string           $dir       A directory path
-     * @param ContainerBuilder $container A ContainerBuilder instance
-     *
      * @return string|null A metadata driver short name, if one can be detected
      */
-    protected function detectMetadataDriver($dir, ContainerBuilder $container)
+    protected function detectMetadataDriver(string $dir, ContainerBuilder $container)
     {
         $configPath = $this->getMappingResourceConfigDirectory();
         $extension = $this->getMappingResourceExtension();
@@ -284,13 +266,9 @@ abstract class AbstractDoctrineExtension extends Extension
     /**
      * Loads a configured object manager metadata, query or result cache driver.
      *
-     * @param array            $objectManager A configured object manager
-     * @param ContainerBuilder $container     A ContainerBuilder instance
-     * @param string           $cacheName
-     *
      * @throws \InvalidArgumentException in case of unknown driver type
      */
-    protected function loadObjectManagerCacheDriver(array $objectManager, ContainerBuilder $container, $cacheName)
+    protected function loadObjectManagerCacheDriver(array $objectManager, ContainerBuilder $container, string $cacheName)
     {
         $this->loadCacheDriver($cacheName, $objectManager['name'], $objectManager[$cacheName.'_driver'], $container);
     }
@@ -298,16 +276,11 @@ abstract class AbstractDoctrineExtension extends Extension
     /**
      * Loads a cache driver.
      *
-     * @param string           $cacheName         The cache driver name
-     * @param string           $objectManagerName The object manager name
-     * @param array            $cacheDriver       The cache driver mapping
-     * @param ContainerBuilder $container         The ContainerBuilder instance
-     *
      * @return string
      *
      * @throws \InvalidArgumentException
      */
-    protected function loadCacheDriver($cacheName, $objectManagerName, array $cacheDriver, ContainerBuilder $container)
+    protected function loadCacheDriver(string $cacheName, string $objectManagerName, array $cacheDriver, ContainerBuilder $container)
     {
         $cacheDriverServiceId = $this->getObjectManagerElementName($objectManagerName.'_'.$cacheName);
 
@@ -410,11 +383,9 @@ abstract class AbstractDoctrineExtension extends Extension
      *
      * @example $name is 'entity_manager' then the result would be 'doctrine.orm.entity_manager'
      *
-     * @param string $name
-     *
      * @return string
      */
-    abstract protected function getObjectManagerElementName($name);
+    abstract protected function getObjectManagerElementName(string $name);
 
     /**
      * Noun that describes the mapped objects such as Entity or Document.
@@ -440,13 +411,16 @@ abstract class AbstractDoctrineExtension extends Extension
     abstract protected function getMappingResourceExtension();
 
     /**
+     * The class name used by the various mapping drivers.
+     */
+    abstract protected function getMetadataDriverClass(string $driverType): string;
+
+    /**
      * Search for a manager that is declared as 'auto_mapping' = true.
-     *
-     * @return string|null The name of the manager. If no one manager is found, returns null
      *
      * @throws \LogicException
      */
-    private function validateAutoMapping(array $managerConfigs)
+    private function validateAutoMapping(array $managerConfigs): ?string
     {
         $autoMappedManager = null;
         foreach ($managerConfigs as $name => $manager) {
@@ -455,7 +429,7 @@ abstract class AbstractDoctrineExtension extends Extension
             }
 
             if (null !== $autoMappedManager) {
-                throw new \LogicException(sprintf('You cannot enable "auto_mapping" on more than one manager at the same time (found in "%s" and %s").', $autoMappedManager, $name));
+                throw new \LogicException(sprintf('You cannot enable "auto_mapping" on more than one manager at the same time (found in "%s" and "%s"").', $autoMappedManager, $name));
             }
 
             $autoMappedManager = $name;

@@ -116,7 +116,7 @@ switch ($vars['REQUEST_URI']) {
         echo '<1>';
         @ob_flush();
         flush();
-        usleep(500000);
+        usleep(600000);
         echo '<2>';
         exit;
 
@@ -154,6 +154,27 @@ switch ($vars['REQUEST_URI']) {
             flush();
             usleep(500);
         }
+        exit;
+
+    case '/json':
+        header("Content-Type: application/json");
+        echo json_encode([
+            'documents' => [
+                ['id' => '/json/1'],
+                ['id' => '/json/2'],
+                ['id' => '/json/3'],
+            ],
+        ]);
+        exit;
+
+    case '/json/1':
+    case '/json/2':
+    case '/json/3':
+        header("Content-Type: application/json");
+        echo json_encode([
+            'title' => $vars['REQUEST_URI'],
+        ]);
+
         exit;
 }
 

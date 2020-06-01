@@ -44,32 +44,34 @@
                 <div class="sidebar-mobile-menu visible-xs"><a href="#" class="with-animation">
                         <!-- add class "with-animation" to support animation --> <i class="entypo-menu"></i> </a></div>
             </header>
+            
             <ul id="main-menu" class="main-menu">
-                <li><a href="{{ path('admin_homepage_action') }}"><i class="entypo-gauge"></i><span
+                <li><a href="{{ path('admin_dash') }}"><i class="entypo-gauge"></i><span
                                 class="title">Tableau de bord</span></a>
                 </li>
                 <li>
-                    <a href=""><i class="entypo-list"></i><span
+                    <a href="{{path('user_index')}}"><i class="entypo-list"></i><span
                                 class="title">Liste des membres</span></a>
                 </li>
-                <li>
-                    <a href=""><i class="entypo-list"></i><span
-                                class="title">Liste des utilisateurs</span></a>
-                </li>
+               
+              
                 <li class="has-sub"><a href=""><i class="entypo-layout"></i><span class="title">Restaurants</span></a>
                     <ul>
-                        <li><a href="{{ path('admin_restaurant') }}"><span class="title">Voir les restaurants</span></a></li>
-                        <li><a href="{{ path('admin_restaurant_insert') }}"><span class="title">Ajouter des restaurants</span></a></li>
+                        <li><a href="{{ path('restaurant_index') }}"><span class="title">Voir les restaurants</span></a></li>
+                        <li><a href="{{ path('restaurant_new') }}"><span class="title">Ajouter des restaurants</span></a></li>
                     </ul>
                 </li>
                 <li class="has-sub"><a href=""><i class="entypo-list-add"></i><span class="title">Vaisselle</span></a>
                     <ul>
-                        <li><a href=""><span class="title">Voir les plats</span></a></li>
-                        <li><a href=""><span class="title">Ajouter des plats</span></a></li>
+                        <li><a href="{{ path('plat_index') }}"><span class="title">Voir les plats</span></a></li>
+                        <li><a href="{{ path('plat_new') }}"><span class="title">Ajouter des plats</span></a></li>
                     </ul>
                 </li>
-                <li class=""><a href=""><i class="entypo-lock"></i><span class="title">Changer le mot de passe</span></a></li>
-                <li class="{% block users_active %}{% endblock %}"><a href="{{ path('admin_logout') }}"><i class="entypo-logout"></i><span class="title">Déconnexion</span></a></li>
+                   <li>
+                    <a href="{{ path('commande_index') }}"><i class="entypo-list"></i><span
+                                class="title">Liste des commandes</span></a>
+                </li>
+                <li class="{% block users_active %}{% endblock %}"><a href="{{ path('logout') }}"><i class="entypo-logout"></i><span class="title">Déconnexion</span></a></li>
             </ul>
         </div>
     </div>
@@ -77,13 +79,13 @@
         <!-- TS15383785128609: Xenon - Boostrap Admin Template created by Laborator / Please buy this theme and support the updates -->
         <div class="row"> <!-- Profile Info and Notifications -->
             <div class="col-md-6 col-sm-8 clearfix">
-                <a href="{{ path('homepage') }}" target="_blank">
+                <a href="{{ path('home') }}" target="_blank">
                     <h4 style="padding-top: 7px; font-family: 'Raleway Medium'">Visitez le site Web</h4>
                 </a>
             </div> <!-- Raw Links -->
             <div class="col-md-6 col-sm-4 clearfix hidden-xs">
                 <ul class="list-inline links-list pull-right">
-                    <li><a href="{{ path('admin_logout') }}">
+                    <li><a href="{{ path('logout') }}">
                             Déconnexion
                             <i class="entypo-logout right"></i> </a>
                     </li>

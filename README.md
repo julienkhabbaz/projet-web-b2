@@ -4,5 +4,5 @@ Projet de Développement WEB
 
 Site de livraison de repas
 
-Julien Khabbaz
+Julien Khabbaz //
 William Fernandes

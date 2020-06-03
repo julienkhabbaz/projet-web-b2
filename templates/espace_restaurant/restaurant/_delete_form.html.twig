@@ -1,6 +1,0 @@
-<form method="post" action="{{ path('restaurants_delete', {'id': restaurant.id}) }}" onsubmit="return confirm('Etes vous sur ?');">
-    <input type="hidden" name="_method" value="DELETE">
-    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ restaurant.id) }}">
-    <button style="margin-top:5px" class="btn btn-primary btn-sm btn-icon icon-left"> <i class="entypo-trash"></i>Supprimer</button>
-
-</form>

@@ -1,0 +1,12 @@
+{% extends 'restaurant.html.twig' %}
+
+{% block title %}Modifier Plat{% endblock %}
+
+{% block body %}
+    <h1>Modifier Plat</h1>
+
+    {{ include('espace_retaurant/plat/_form.html.twig', {'button_label': 'Modifier'}) }}
+
+    <a href="{{ path('mes_plats_restaurants') }}">retour a la liste</a>
+
+{% endblock %}

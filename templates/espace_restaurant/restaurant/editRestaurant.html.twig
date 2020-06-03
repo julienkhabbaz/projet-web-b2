@@ -1,0 +1,13 @@
+{% extends 'restaurant.html.twig' %}
+
+{% block title %}Modifier{% endblock %}
+
+{% block body %}
+    <h1>Modifier Restaurant</h1>
+
+    {{ include('espace_restaurant/restaurant/_form.html.twig', {'button_label': 'Modifier'}) }}
+
+    <a href="{{ path('mes_restaurants') }}">retour a la liste</a>
+    {{ include('espace_restaurant/restaurant/_delete_form.html.twig') }}
+
+{% endblock %}

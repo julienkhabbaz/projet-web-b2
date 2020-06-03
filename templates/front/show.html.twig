@@ -1,0 +1,60 @@
+
+{% extends 'base.html.twig' %}
+{% block title restaurant.name %}
+
+{% block body %}	
+    <div class="container">
+        <div class="row">
+            <div class="col-sm-6 col-lg-6">
+
+            {% if restaurant.filename %}
+				<img class="img-fluid" src="{{ vich_uploader_asset(restaurant,'imageFile') | imagine_filter('medium') }}" alt="card-img-top">
+            {% else %}
+				<img src="{{ '/images/restaurants/empty.png' | imagine_filter('medium') }}" alt="card-img-top" style="width: 100%; height:auto;">
+                {% endif %}
+            </div>
+            <div class="col-sm-6"><h1>{{restaurant.name}}</h1>
+                <p class="margin-top:0px">Description: {{restaurant.description | nl2br}}</p>
+                <p  style="margin-top:0px;">Adresse: {{restaurant.adresse}}</p>
+            </div>
+        
+        </div>
+		<div class="row">
+        <table class="table tab-stripedble">
+        <h1>Plats </h1>
+            <thead>
+                <tr>
+                <th></th>
+                <th>Libele</th>
+                <th>Description</th>
+                <th>Prix</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for plat in restaurant.plats %}
+            <tr>
+             {% if plat.filename %}
+				<td style="vertical-align: left;"><img src="{{ vich_uploader_asset(plat,'imageFile')  | imagine_filter('thumb')}}" alt="card-img-top" style="width: 50; height:auto;"></td>
+                {% else %}
+				<td><img src="{{ '/images/restaurants/empty.png' | imagine_filter('thumb') }}" alt="Logo" style="width: 50px; height:60px;"></td>
+                {% endif %}
+                <td>{{ plat.libele }}</td>
+                <td>{{ plat.description  | nl2br}}</td>
+                <td>{{plat.formattedPrice}} €</td>
+                <td><a href="{{ path('commander', {'id': plat.id}) }}" class="btn btn-primary "> Commander</a></td>
+               
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="5">aucun plat trouve</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+			
+		</div>
+    </div>
+
+  
+{% endblock %}
